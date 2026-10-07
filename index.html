@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Кубические шахматы</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #111714;
+      color: #edf3ed;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse at 20% 0%, #263b2d 0, transparent 40%),
+        #111714;
+    }
+
+    button { font: inherit; }
+
+    .app {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      padding: 28px 20px 40px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.6rem, 4vw, 2.3rem);
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle {
+      margin: 6px 0 0;
+      color: #aab8ae;
+      font-size: .95rem;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(300px, 660px) minmax(260px, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .board-wrap {
+      padding: 12px;
+      border: 1px solid #34473b;
+      border-radius: 18px;
+      background: #1c2820;
+      box-shadow: 0 18px 55px #0005;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      aspect-ratio: 1;
+      overflow: hidden;
+      border-radius: 9px;
+    }
+
+    .square {
+      position: relative;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 0;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .square.light { background: #e8dfc8; }
+    .square.dark { background: #66816b; }
+
+    .square.selected {
+      box-shadow: inset 0 0 0 5px #f4d35e;
+    }
+
+    .square.last-move {
+      background-image: linear-gradient(#f2d56866, #f2d56866);
+    }
+
+    .square.legal::after {
+      content: "";
+      width: 24%;
+      aspect-ratio: 1;
+      position: absolute;
+      border-radius: 50%;
+      background: #16271f66;
+    }
+
+    .square.legal.capture::after {
+      width: 82%;
+      background: transparent;
+      border: 5px solid #16271f66;
+    }
+
+    .piece {
+      position: relative;
+      z-index: 1;
+      line-height: 1;
+      font-family: "DejaVu Sans", "Segoe UI Symbol", sans-serif;
+      font-size: clamp(2rem, 8vw, 4.2rem);
+      filter: drop-shadow(0 2px 1px #0004);
+    }
+
+    .piece.white { color: #fffdf3; }
+    .piece.black { color: #182019; }
+
+    .piece.used { opacity: .48; }
+
+    .coord {
+      position: absolute;
+      z-index: 2;
+      left: 4px;
+      top: 2px;
+      font-size: clamp(.55rem, 1.5vw, .75rem);
+      font-weight: 700;
+      opacity: .72;
+      pointer-events: none;
+    }
+
+    .light .coord { color: #50614f; }
+    .dark .coord { color: #f1ead7; }
+
+    .side {
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      padding: 18px;
+      border: 1px solid #34473b;
+      border-radius: 16px;
+      background: #1c2820;
+    }
+
+    .turn-label {
+      color: #aab8ae;
+      font-size: .85rem;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+    }
+
+    .turn-name {
+      margin: 5px 0 0;
+      font-size: 1.4rem;
+      font-weight: 750;
+    }
+
+    .status {
+      min-height: 44px;
+      margin: 12px 0 0;
+      color: #c8d3cb;
+      line-height: 1.45;
+    }
+
+    .dice-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin: 16px 0;
+    }
+
+    .die {
+      width: 62px;
+      height: 62px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: #eef1df;
+      color: #1a241c;
+      font-size: 2.4rem;
+      box-shadow: inset 0 -4px #c8cfbd;
+    }
+
+    .remaining {
+      color: #c8d3cb;
+      line-height: 1.4;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .action {
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1px solid #536b59;
+      border-radius: 10px;
+      background: #293a2e;
+      color: #f2f6ef;
+      cursor: pointer;
+      font-weight: 700;
+      transition: background .15s, transform .15s;
+    }
+
+    .action:hover:not(:disabled) {
+      background: #38513e;
+      transform: translateY(-1px);
+    }
+
+    .action.primary {
+      border-color: #b7d59c;
+      background: #b7d59c;
+      color: #172019;
+    }
+
+    .action.primary:hover:not(:disabled) { background: #c9e5b0; }
+
+    .action:disabled {
+      cursor: not-allowed;
+      opacity: .45;
+    }
+
+    .section-title {
+      margin: 0 0 12px;
+      font-size: 1rem;
+    }
+
+    .history {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-height: 185px;
+      overflow-y: auto;
+    }
+
+    .history span {
+      padding: 5px 8px;
+      border-radius: 7px;
+      background: #293a2e;
+      color: #d6e0d7;
+      font-size: .9rem;
+    }
+
+    .rules {
+      margin: 0;
+      padding-left: 18px;
+      color: #b6c2b8;
+      font-size: .9rem;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 780px) {
+      .app { padding: 18px 12px 28px; }
+      header { align-items: flex-start; }
+      .layout { grid-template-columns: 1fr; }
+      .board-wrap { padding: 8px; }
+      .piece { font-size: clamp(2rem, 10vw, 4rem); }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <h1>Кубические шахматы</h1>
+        <p class="subtitle">Брось кубик — используй выпавшее число ходов</p>
+      </div>
+      <button class="action" id="newGame">Новая партия</button>
+    </header>
+
+    <div class="layout">
+      <section class="board-wrap" aria-label="Шахматная доска">
+        <div class="board" id="board"></div>
+      </section>
+
+      <aside class="side">
+        <section class="card">
+          <div class="turn-label">Сейчас ходят</div>
+          <div class="turn-name" id="turnName">Белые</div>
+          <p class="status" id="status">Бросьте кубик, чтобы начать ход.</p>
+
+          <div class="dice-row">
+            <div class="die" id="die" aria-label="Результат кубика">–</div>
+            <div class="remaining" id="remaining">Ходы ещё не выпали</div>
+          </div>
+
+          <div class="buttons">
+            <button class="action primary" id="roll">Бросить кубик</button>
+            <button class="action" id="endTurn" disabled>Закончить ход</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 class="section-title">Ходы партии</h2>
+          <div class="history" id="history">
+            <span>Партия началась</span>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 class="section-title">Правила прототипа</h2>
+          <ul class="rules">
+            <li>За ход выпадает от 1 до 3 ходов.</li>
+            <li>В одной серии нельзя ходить одной фигурой дважды.</li>
+            <li>Шах завершает серию ходов.</li>
+            <li>Превращение пешки автоматически выбирает ферзя.</li>
+            <li>Игра рассчитана на двух игроков за одним экраном.</li>
+          </ul>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <script type="module">
+    import { Chess } from "https://esm.sh/chess.js@1.4.0";
+
+    const glyphs = {
+      w: { k: "♔", q: "♕", r: "♖", b: "♗", n: "♘", p: "♙" },
+      b: { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" }
+    };
+    const diceFaces = ["", "⚀", "⚁", "⚂"];
+
+  
+
+    const boardEl = document.querySelector("#board");
+    const files = "abcdefgh";
+    const turnNameEl = document.querySelector("#turnName");
+    const statusEl = document.querySelector("#status");
+    const dieEl = document.querySelector("#die");
+    const remainingEl = document.querySelector("#remaining");
+    const historyEl = document.querySelector("#history");
+    const rollButton = document.querySelector("#roll");
+    const endButton = document.querySelector("#endTurn");
+
+   
+
+    let game;
+    let pieceIds;
+    let nextPieceId;
+    let activeColor;
+    let rolled;
+    let remaining;
+    let remainingAtStart = 0;
+    let usedPieces;
+    let selected;
+    let legalTargets;
+    let lastMove;
+    let history;
+    let finished;
+    let message;
+
+    function squareName(file, rank) {
+      return files[file] + rank;
+    }
+
+    function setupPieceIds() {
+      pieceIds = new Map();
+      nextPieceId = 1;
+
+      for (let rank = 1; rank <= 8; rank++) {
+        for (let file = 0; file < 8; file++) {
+          const square = squareName(file, rank);
+          if (game.get(square)) {
+            pieceIds.set(square, nextPieceId++);
+          }
+        }
+      }
+    }
+
+    function playerName(color) {
+      return color === "w" ? "Белые" : "Чёрные";
+    }
+
+    function startNewGame() {
+      game = new Chess();
+      setupPieceIds();
+
+      activeColor = "w";
+      rolled = false;
+      remaining = 0;
+      remainingAtStart = 0;
+      usedPieces = new Set();
+      selected = null;
+      legalTargets = [];
+      lastMove = null;
+      history = [];
+      finished = false;
+      message = "Бросьте кубик, чтобы начать ход.";
+
+      render();
+    }
+
+    function renderHistory() {
+      historyEl.replaceChildren();
+
+      if (history.length === 0) {
+        const item = document.createElement("span");
+        item.textContent = "Партия началась";
+        historyEl.append(item);
+        return;
+      }
+
+      for (const san of history) {
+        const item = document.createElement("span");
+        item.textContent = san;
+        historyEl.append(item);
+      }
+    }
+
+    function renderBoard() {
+      boardEl.replaceChildren();
+
+      for (let rank = 8; rank >= 1; rank--) {
+        for (let file = 0; file < 8; file++) {
+          const square = squareName(file, rank);
+          const piece = game.get(square);
+          const button = document.createElement("button");
+
+          button.type = "button";
+          button.className =
+            "square " + ((rank + file) % 2 === 0 ? "dark" : "light");
+          button.setAttribute("aria-label", square);
+          button.addEventListener("click", () => onSquareClick(square));
+
+          if (selected === square) button.classList.add("selected");
+
+          if (lastMove && (lastMove.from === square || lastMove.to === square)) {
+            button.classList.add("last-move");
+          }
+
+          if (legalTargets.includes(square)) {
+            button.classList.add("legal");
+            if (piece) button.classList.add("capture");
+          }
+
+          if (file === 0 || rank === 1) {
+            const coord = document.createElement("span");
+            coord.className = "coord";
+            coord.textContent = file === 0 ? String(rank) : files[file];
+            button.append(coord);
+          }
+
+          if (piece) {
+            const pieceEl = document.createElement("span");
+            pieceEl.className =
+              "piece " + (piece.color === "w" ? "white" : "black");
+
+            const id = pieceIds.get(square);
+            if (usedPieces.has(id)) pieceEl.classList.add("used");
+
+            pieceEl.textContent = glyphs[piece.color][piece.type];
+            button.append(pieceEl);
+          }
+
+          boardEl.append(button);
+        }
+      }
+    }
+
+    function render() {
+      turnNameEl.textContent = playerName(activeColor);
+      statusEl.textContent = message;
+      dieEl.textContent = rolled ? diceFaces[remainingAtStart] : "–";
+
+      if (!rolled) {
+        remainingEl.textContent = finished
+          ? "Партия завершена"
+          : "Ходы ещё не выпали";
+      } else {
+        remainingEl.textContent = `Осталось ходов: ${remaining}`;
+      }
+
+      rollButton.disabled = rolled || finished;
+      endButton.disabled = !rolled || finished;
+
+      renderBoard();
+      renderHistory();
+    }
+
+    function finishSeries() {
+      rolled = false;
+      remaining = 0;
+      usedPieces = new Set();
+      selected = null;
+      legalTargets = [];
+
+      if (game.isGameOver()) {
+        finished = true;
+
+        if (game.isCheckmate()) {
+          const winner = game.turn() === "w" ? "b" : "w";
+          message = `Мат! Победили ${playerName(winner)}.`;
+        } else if (game.isStalemate()) {
+          message = "Пат. Ничья.";
+        } else {
+          message = "Партия завершена вничью.";
+        }
+      } else {
+        activeColor = game.turn();
+        message = game.isCheck()
+          ? `${playerName(activeColor)} под шахом. Бросьте кубик.`
+          : `${playerName(activeColor)}: бросьте кубик.`;
+      }
+
+      render();
+    }
+
+    function onSquareClick(square) {
+      if (finished || !rolled) return;
+
+      if (selected && legalTargets.includes(square)) {
+        makeMove(selected, square);
+        return;
+      }
+
+      const piece = game.get(square);
+      const id = pieceIds.get(square);
+
+      if (!piece || piece.color !== activeColor || usedPieces.has(id)) {
+        selected = null;
+        legalTargets = [];
+        message = "Выберите свою ещё не использованную фигуру.";
+        render();
+        return;
+      }
+
+      const moves = game.moves({ square, verbose: true });
+
+      if (moves.length === 0) {
+        selected = null;
+        legalTargets = [];
+        message = "У этой фигуры сейчас нет легальных ходов.";
+        render();
+        return;
+      }
+
+      selected = square;
+      legalTargets = moves.map(move => move.to);
+      message = `Выбрана фигура на ${square}. Нажмите на подсвеченную клетку.`;
+      render();
+    }
+
+    function makeMove(from, to) {
+      const movingPiece = game.get(from);
+      const movingId = pieceIds.get(from);
+      const isCastle =
+        movingPiece.type === "k" &&
+        Math.abs(files.indexOf(to[0]) - files.indexOf(from[0])) === 2;
+
+      let capturedSquare = to;
+
+      // Взятие пешки на проходе.
+      if (movingPiece.type === "p" && from[0] !== to[0] && !game.get(to)) {
+        capturedSquare = to[0] + from[1];
+      }
+
+      const rookFrom = isCastle
+        ? (to[0] > from[0] ? "h" : "a") + from[1]
+        : null;
+
+      const rookTo = isCastle
+        ? (to[0] > from[0] ? "f" : "d") + from[1]
+        : null;
+
+      const rookId = isCastle ? pieceIds.get(rookFrom) : null;
+
+      pieceIds.delete(capturedSquare);
+      pieceIds.delete(from);
+      pieceIds.set(to, movingId);
+
+      if (isCastle) {
+        pieceIds.delete(rookFrom);
+        pieceIds.set(rookTo, rookId);
+      }
+
+      const move = game.move({
+        from,
+        to,
+        promotion: "q"
+      });
+
+      history.push(move.san);
+      lastMove = { from, to };
+      usedPieces.add(movingId);
+
+      if (isCastle) {
+        usedPieces.add(rookId);
+      }
+
+      remaining--;
+      selected = null;
+      legalTargets = [];
+
+      if (game.isGameOver()) {
+        finishSeries();
+        return;
+      }
+
+      // Если поставлен шах, серия сразу переходит сопернику.
+      if (game.isCheck()) {
+        finishSeries();
+        return;
+      }
+
+      if (remaining === 0) {
+        finishSeries();
+        return;
+      }
+
+      // Серия продолжается: снова разрешаем ходить тому же игроку.
+      const fields = game.fen().split(" ");
+      fields[1] = activeColor;
+      game.load(fields.join(" "));
+
+      message =
+        `${playerName(activeColor)}: выберите другую фигуру. ` +
+        `Осталось ходов: ${remaining}.`;
+
+      render();
+    }
+
+    rollButton.addEventListener("click", () => {
+      if (finished || rolled) return;
+
+      remaining = Math.floor(Math.random() * 3) + 1;
+      remainingAtStart = remaining;
+      rolled = true;
+      usedPieces = new Set();
+      selected = null;
+      legalTargets = [];
+
+      message =
+        `${playerName(activeColor)} выбрасывают ${remaining}. Выберите фигуру.`;
+
+      render();
+    });
+
+    endButton.addEventListener("click", () => {
+      if (!rolled || finished) return;
+
+      // При досрочном завершении передаём очередь сопернику.
+      const fields = game.fen().split(" ");
+      fields[1] = activeColor === "w" ? "b" : "w";
+      game.load(fields.join(" "));
+
+      finishSeries();
+    });
+
+    document.querySelector("#newGame").addEventListener("click", startNewGame);
+
+    startNewGame();
+  </script>
+</body>
+</html>
